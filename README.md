@@ -37,3 +37,17 @@ Idea is following :
 
 ### *Camera​*
 
+* In this project, what we needed was only `camera position` and `camera target`. 
+* Therefore, we did not create some abstract camera class. 
+* We simply calculate `camera position` and `camera target` and update them as `uniform` to the `fragment shader`.
+* Source for implementation : http://www.opengl-tutorial.org/beginners-tutorials/tutorial-6-keyboard-and-mouse/
+* Keyboard Controls for camera are: 
+  * `UP` to move forward.
+  * `DOWN` key to move backwards.
+  * `LEFT` key to move left.
+  * `RIGHT` key to move right.
+
+* Mouse control for camera:
+  * They are for Orientation.
+  * Orientation is the angle from vertical and angle from horizontal.
+  * `Height/2` is taken as base for vertical. Coordinates' difference from it is measured as change in angle. Similarly `Width/2` is taken as base for horizontal angle.

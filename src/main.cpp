@@ -8,8 +8,9 @@ int main(int, char**)
 {
     // Setup window
     GLFWwindow *window = setupWindow(width, height);
-    ImGuiIO& io = ImGui::GetIO(); // Create IO object
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    std::cout <<  glGetString(GL_VENDOR) << '\n';
     ImVec4 clearColor = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
 
     unsigned int shaderProgram = createProgram("./shaders/vshader.vs", "./shaders/fshader.fs");
@@ -51,35 +52,88 @@ int main(int, char**)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+    //Camera
+    glm::vec3 position = glm::vec3( 0, 0, 5 );
+    float horizontalAngle = 3.14f;
+    float verticalAngle = 0.0f;
+    float initialFoV = 45.0f;
+
+    float speed = 3.0f; // 3 units / second
+    float mouseSpeed = 0.5f;
+
+    float lastTime = glfwGetTime();
+    
+    int display_w, display_h;
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+    glfwSetCursorPos(window, double(display_w)/2, double(display_h)/2);
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
         glUseProgram(shaderProgram);
 
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin("Information");                          
-            ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
-        ImGui::Render();
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glUseProgram(shaderProgram);
+
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        
+        double currentTime = glfwGetTime();
+        float deltaTime = float(currentTime - lastTime);
+        horizontalAngle += mouseSpeed * deltaTime * float(double(display_w)/2 - xpos );
+        verticalAngle   += mouseSpeed * deltaTime * float(double(display_h)/2 - ypos );
+        
+        glm::vec3 right = glm::vec3(
+            sin(horizontalAngle - 3.14f/2.0f),
+            0,
+            cos(horizontalAngle - 3.14f/2.0f)
+        );
+
+        glm::vec3 direction(
+            cos(verticalAngle) * sin(horizontalAngle),
+            sin(verticalAngle),
+            cos(verticalAngle) * cos(horizontalAngle)
+        );
+        glm::vec3 up = glm::cross( right, direction );
+        if (glfwGetKey( window,GLFW_KEY_UP ) == GLFW_PRESS){
+            position += direction * deltaTime * speed;
+        }
+        // Move backward
+        if (glfwGetKey( window,GLFW_KEY_DOWN ) == GLFW_PRESS){
+            position -= direction * deltaTime * speed;
+        }
+        // Strafe right
+        if (glfwGetKey( window,GLFW_KEY_RIGHT ) == GLFW_PRESS){
+            position += right * deltaTime * speed;
+        }
+        // Strafe left
+        if (glfwGetKey( window,GLFW_KEY_LEFT ) == GLFW_PRESS){
+            position -= right * deltaTime * speed;
+        }
+
+        GLuint u_camPositions = glGetUniformLocation(shaderProgram, "cameraPos");
+        GLuint u_camTarget = glGetUniformLocation(shaderProgram, "camera_target");
+        if (u_camPositions == -1) {
+            fprintf(stderr, "Could not bind location: camPosition\n");
+            exit(0);
+        }
+        if (u_camTarget == -1) {
+            fprintf(stderr, "Could not bind location: camTarget\n");
+            exit(0);
+        }
+
+        glm::vec3 camPos = position;
+        glUniform3fv(u_camPositions, 1, glm::value_ptr(camPos));
+
+        glm::vec3 camera_target =  position+direction;
+        glUniform3fv(u_camTarget, 1, glm::value_ptr(camera_target));
+
         glBindVertexArray(VAO);
         glClearColor(clearColor.x, clearColor.y, clearColor.z, clearColor.w);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glfwSetCursorPos(window, double(display_w)/2.0, double(display_h)/2.0);
+        lastTime = currentTime;
         glfwSwapBuffers(window);
     }
     cleanup(window);
