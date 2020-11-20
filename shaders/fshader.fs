@@ -7,6 +7,9 @@ in vec4 gl_FragCoord;
 uniform vec3 cameraPos;
 uniform vec3 camera_target;
 
+// vec3 cameraPos = vec3(0,10,10);
+// vec3 camera_target = vec3(0,0,0);
+
 int SCR_WIDTH = 1800;
 int SCR_HEIGHT = 1000;
 
@@ -24,31 +27,88 @@ float t = FLT_MAX;
 
 out vec4 color;
 
+struct pointLight{
+    vec3 position;
+    vec3 intensity;
+    vec3 color;
+};
+
 struct World{
     vec3 bgcolor;
 };
 
-struct Material{
-    vec3 color;
+struct BasicMaterial{
+    //
+    float k_a;
+    vec3 c_a; //ambient color
+    
+    //Diffuse
+    float k_d;
+    vec3 c_r; //diffuse reflectance
+    
+    //Specular
+    float k_s; 
+    vec3 c_p; // phong highlight
+    int n; // phong exponent
 };
 
 struct Ray {
         vec3 origin;
         vec3 direction;
+        float t;
+        bool hit;
+        int object;
 };
     
 struct Sphere {
         vec3 origin;
         float radius;
-        Material m;
+        int material;
 };
-    
-bool intersect(Ray r, Sphere s);
+
+const int num_materials = 2;
+const int num_objects = 2;
+const int num_lights = 1;
+
+World world;
+BasicMaterial material_set[num_materials];
+Sphere object_set[num_objects];
+pointLight light_set[num_lights];
+
+void intersect(inout Ray r, int s);
 
 void main() {
-    
-    World world;
+
     world.bgcolor = vec3(0.28, 0.28, 0.28);
+
+    material_set[0].k_a = 0.3;
+    material_set[0].c_a =  vec3(1.0, 0.43, 0.14);
+    material_set[0].k_d = 0.8;
+    material_set[0].c_r = vec3(1.0, 0.43, 0.14); 
+    material_set[0].k_s = 0.2; 
+    material_set[0].c_p = vec3(1.0,1.0,1.0); 
+    material_set[0].n = 2; 
+
+    material_set[1].k_a = 0.3;
+    material_set[1].c_a =  vec3(1.0, 0.0, 0.9);
+    material_set[1].k_d = 0.8;
+    material_set[1].c_r = vec3(1.0, 0.43, 0.14); 
+    material_set[1].k_s = 0.2; 
+    material_set[1].c_p = vec3(1.0,1.0,1.0); 
+    material_set[1].n = 2; 
+
+    object_set[0].origin = vec3(2, 0, 0);
+    object_set[0].radius = 1;
+    object_set[0].material = 0;
+
+    object_set[1].origin = vec3(2, 0, -2);
+    object_set[1].radius = 1;
+    object_set[1].material = 1;   
+
+    light_set[0].position = vec3(0,10,0);
+    light_set[0].intensity = vec3(1.0,1.0,1.0);
+    light_set[0].color = vec3(1.0,1.0,1.0);
+    
     vec3 line_of_sight = camera_target - cameraPos;
     vec3 w = -normalize(line_of_sight);
     vec3 u = normalize(cross(camera_up, w));
@@ -61,34 +121,51 @@ void main() {
 	float yw = (j - SCR_HEIGHT/2.0 + 0.5)/SCR_HEIGHT;
 	dir += u * xw;
 	dir += v * yw;
+    
     Ray r;
     r.origin = cameraPos;
     r.direction = normalize(dir);
+    r.t = FLT_MAX;
+    r.hit = false;
+    r.object = -1;
     
-    Material m;
-    m.color =  vec3(0.1, 0.7, 0.0);
-    Sphere s;
-    s.origin = vec3(2, 0, -10);
-    s.radius = 3;
-    s.m = m;
+    for(int i = 0 ; i < num_objects; i++){
+        intersect(r,i);
+    }
 
-    if (intersect(r,s)){
-        color = vec4(s.m.color,1.0);
-    }        
-    else{
+    if (r.hit){
+        color = vec4(material_set[object_set[r.object].material].c_a,1.0);
+    } else {
         color = vec4(world.bgcolor,1.0);
     }
 };
 
- bool intersect(Ray r, Sphere s) {
+void intersect(inout Ray r, int index) {
+    Sphere s = object_set[index];
     float a = dot(r.direction,r.direction);
     float b = dot(r.direction, 2.0 * (r.origin-s.origin));
-    float c = dot(s.origin, s.origin) + dot(r.origin,r.origin) +-2.0*dot(r.origin,s.origin) - (s.radius*s.radius);
+    float c = dot(s.origin, s.origin) + dot(r.origin,r.origin) +
+              -2.0*dot(r.origin,s.origin) - (s.radius*s.radius);
     
     float disc = b*b + (-4.0)*a*c;
     
     if (disc < 0){
-        return false;
+        return;
     }
-    return true;
+    
+    float D = sqrt(disc);
+	float t1 = (-b +D)/(2.0*a);
+	float t2 = (-b -D)/(2.0*a);
+
+    if(t1 < r.t && t1 > SMALLEST_DIST){
+        r.hit = true;
+        r.t = t1;
+        r.object = index;
+    }
+
+    if(t2 < r.t && t2 > SMALLEST_DIST){
+        r.hit = true;
+        r.t = t2;
+        r.object = index;
+    }
 }

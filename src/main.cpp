@@ -58,8 +58,8 @@ int main(int, char**)
     float verticalAngle = 0.0f;
     float initialFoV = 45.0f;
 
-    float speed = 3.0f; // 3 units / second
-    float mouseSpeed = 0.5f;
+    float speed = 3.0f; // 3 is optimal. Any faster and it gets messy
+    float mouseSpeed = 0.1f;
 
     float lastTime = glfwGetTime();
     
