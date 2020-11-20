@@ -68,7 +68,7 @@ struct Sphere {
 
 const int num_materials = 2;
 const int num_objects = 3;
-const int num_lights = 1;
+const int num_lights = 2;
 
 BasicMaterial material_set[num_materials];
 Sphere object_set[num_objects];
@@ -112,6 +112,10 @@ void main() {
     light_set[0].position = vec3(0,10,10);
     light_set[0].intensity = vec3(1.0,1.0,1.0);
     light_set[0].color = vec3(1.0,1.0,1.0);
+
+    light_set[1].position = vec3(-10,10,10);
+    light_set[1].intensity = vec3(1.0,1.0,1.0);
+    light_set[1].color = vec3(1.0,0.0,0.0);
     
     vec3 line_of_sight = camera_target - cameraPos;
     vec3 w = -normalize(line_of_sight);
