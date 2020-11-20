@@ -27,7 +27,7 @@ float t = FLT_MAX;
 
 out vec4 color;
 
-struct pointLight{
+struct PointLight{
     vec3 position;
     vec3 intensity;
     vec3 color;
@@ -61,21 +61,21 @@ struct Ray {
 };
     
 struct Sphere {
-        vec3 origin;
+        vec3 centre;
         float radius;
         int material;
 };
 
 const int num_materials = 2;
-const int num_objects = 2;
+const int num_objects = 3;
 const int num_lights = 1;
 
-World world;
 BasicMaterial material_set[num_materials];
 Sphere object_set[num_objects];
-pointLight light_set[num_lights];
-
+PointLight light_set[num_lights];
+World world;
 void intersect(inout Ray r, int s);
+vec4 shade(inout Ray r);
 
 void main() {
 
@@ -91,21 +91,25 @@ void main() {
 
     material_set[1].k_a = 0.3;
     material_set[1].c_a =  vec3(1.0, 0.0, 0.9);
-    material_set[1].k_d = 0.8;
-    material_set[1].c_r = vec3(1.0, 0.43, 0.14); 
-    material_set[1].k_s = 0.2; 
+    material_set[1].k_d = 0.2;
+    material_set[1].c_r = vec3(0.0, 0.0, 1.0); 
+    material_set[1].k_s = 0.9; 
     material_set[1].c_p = vec3(1.0,1.0,1.0); 
-    material_set[1].n = 2; 
+    material_set[1].n = 100; 
 
-    object_set[0].origin = vec3(2, 0, 0);
+    object_set[0].centre = vec3(2, 0, 0);
     object_set[0].radius = 1;
     object_set[0].material = 0;
 
-    object_set[1].origin = vec3(2, 0, -2);
+    object_set[1].centre = vec3(-2, 0, 0);
     object_set[1].radius = 1;
     object_set[1].material = 1;   
 
-    light_set[0].position = vec3(0,10,0);
+    object_set[2].centre = vec3(0, 2, 0);
+    object_set[2].radius = 1;
+    object_set[2].material = 1;   
+
+    light_set[0].position = vec3(0,10,10);
     light_set[0].intensity = vec3(1.0,1.0,1.0);
     light_set[0].color = vec3(1.0,1.0,1.0);
     
@@ -134,18 +138,46 @@ void main() {
     }
 
     if (r.hit){
-        color = vec4(material_set[object_set[r.object].material].c_a,1.0);
+        color = shade(r);
     } else {
         color = vec4(world.bgcolor,1.0);
     }
 };
 
+vec4 shade(inout Ray r){
+
+    Sphere object = object_set[r.object];
+    BasicMaterial material = material_set[object.material];
+    
+    vec3 color = vec3(0.0,0.0,0.0);
+    vec3 intersectionPosition = r.origin + r.t*r.direction;
+    vec3 v = normalize(r.origin-intersectionPosition);
+    vec3 n = normalize(intersectionPosition - object.centre);
+    for(int i = 0; i < num_lights; i++ ){
+        PointLight light = light_set[i]; 
+        vec3 l = normalize(light.position - intersectionPosition);
+        vec3 h = normalize(v+l);
+
+        float diff = max(dot(n,l),0);
+        vec3 diff_color = material.c_r*light.color*diff;
+
+        vec3 ambient_color = material.c_r*material.c_a;
+
+        float spec = pow(max(dot(n,h),0),material.n);  
+        vec3 spec_color = spec*material.c_p*light.color;
+
+        vec3 L = light.intensity*(material.k_a*ambient_color + 
+                  material.k_d*diff_color + material.k_s*spec_color);
+        color = color + L;
+    }
+    return vec4(color,1.0);
+}
 void intersect(inout Ray r, int index) {
     Sphere s = object_set[index];
     float a = dot(r.direction,r.direction);
-    float b = dot(r.direction, 2.0 * (r.origin-s.origin));
-    float c = dot(s.origin, s.origin) + dot(r.origin,r.origin) +
-              -2.0*dot(r.origin,s.origin) - (s.radius*s.radius);
+    float b = dot(r.direction, 2.0 * (r.origin-s.centre));
+    float c = dot(s.centre, s.centre) + dot(r.origin,r.origin) +
+              -2.0*dot(r.origin,s.centre) - (s.radius*s.radius);
     
     float disc = b*b + (-4.0)*a*c;
     
