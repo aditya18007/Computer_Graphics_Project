@@ -40,27 +40,12 @@ struct Ray {
         vec3 direction;
         float t;
         bool hit;
-        int object;
+        int object_index;
 };
-    
-struct Sphere {
-        vec3 centre;
-        float radius;
-        int type;
-        int material;
-};
-
-const int num_objects = 6;
-Sphere object_set[num_objects];
-
-const int LIGHT = 0;
-const int BLINN_PHONG = 1;
-const int REFLECTIVE = 2;
-const int REFRACTIVE = 3;
 
 struct PointLight{
     vec3 position;
-    int lightMaterial;
+    int lightMaterial_index;
 };
 
 const int num_lights = 2;
@@ -70,7 +55,23 @@ struct LightMaterial{
     vec3 color;
 };
 const int num_lightMaterial = 2;
-LightMaterial lightMaterial_set[num_lightMaterial];
+
+LightMaterial lightMaterial_set[num_lightMaterial];    
+struct Sphere {
+        vec3 centre;
+        float radius;
+        int type_enum;
+        int material_index;
+};
+
+const int num_objects = 4;
+Sphere object_set[num_objects+num_lights];
+// All lights are at the end of array
+
+const int LIGHT = 0;
+const int BLINN_PHONG = 1;
+const int REFLECTIVE = 2;
+const int REFRACTIVE = 3;
 
 
 struct BlinnPhongMaterial{
@@ -119,44 +120,44 @@ void main() {
     blinnPhong_set[1].n = 100; 
 
     light_set[0].position = vec3(0,10,10);
-    light_set[0].lightMaterial = 0;
+    light_set[0].lightMaterial_index = 0;
     lightMaterial_set[0].intensity = vec3(1.0,1.0,1.0);
     lightMaterial_set[0].color = vec3(1.0,1.0,1.0);
 
     light_set[1].position = vec3(-10,10,10);
-    light_set[1].lightMaterial = 1;
+    light_set[1].lightMaterial_index = 1;
     lightMaterial_set[1].intensity = vec3(1.0,1.0,1.0);
     lightMaterial_set[1].color = vec3(1.0,1.0,1.0);
 
     object_set[0].centre = vec3(0, 0, 0);
     object_set[0].radius = 1;
-    object_set[0].type = BLINN_PHONG;
-    object_set[0].material = 0;
+    object_set[0].type_enum = BLINN_PHONG;
+    object_set[0].material_index = 0;
 
     object_set[1].centre = vec3(-2, 0, 0);
     object_set[1].radius = 1;
-    object_set[1].type = BLINN_PHONG;
-    object_set[1].material = 1;   
+    object_set[1].type_enum = BLINN_PHONG;
+    object_set[1].material_index = 1;   
 
     object_set[2].centre = vec3(0, 2, 2);
     object_set[2].radius = 1;
-    object_set[2].type = BLINN_PHONG;
-    object_set[2].material = 1;   
+    object_set[2].type_enum = BLINN_PHONG;
+    object_set[2].material_index = 1;   
     
-    object_set[3].centre = light_set[0].position;
+    object_set[3].centre = camera_target;
     object_set[3].radius = 0.1;
-    object_set[3].type = LIGHT;
-    object_set[3].material = 0;   
-    
-    object_set[4].centre = light_set[1].position;
-    object_set[4].radius = 0.1;
-    object_set[4].type = LIGHT;
-    object_set[4].material = 1;   
+    object_set[3].type_enum = BLINN_PHONG;
+    object_set[3].material_index = 0;   
 
-    object_set[5].centre = camera_target;
+    object_set[4].centre = light_set[0].position;
+    object_set[4].radius = 0.1;
+    object_set[4].type_enum = LIGHT;
+    object_set[4].material_index = 0;   
+    
+    object_set[5].centre = light_set[1].position;
     object_set[5].radius = 0.1;
-    object_set[5].type = BLINN_PHONG;
-    object_set[5].material = 0;   
+    object_set[5].type_enum = LIGHT;
+    object_set[5].material_index = 1;   
 
     vec3 line_of_sight = camera_target - cameraPos;
     vec3 w = -normalize(line_of_sight);
@@ -176,14 +177,14 @@ void main() {
     r.direction = normalize(dir);
     r.t = FLT_MAX;
     r.hit = false;
-    r.object = -1;
+    r.object_index = -1;
     
-    for(int i = 0 ; i < num_objects; i++){
+    for(int i = 0 ; i < num_objects+num_lights; i++){
         intersect(r,i);
     }
 
     if (r.hit){
-        switch(object_set[r.object].type){
+        switch(object_set[r.object_index].type_enum){
             
             case BLINN_PHONG:
                 color = shade_blinn_phong(r);
@@ -198,16 +199,16 @@ void main() {
 };
 
 vec4 shade_light(inout Ray r){
-    Sphere object = object_set[r.object];
-    LightMaterial material = lightMaterial_set[object.material];
+    Sphere object = object_set[r.object_index];
+    LightMaterial material = lightMaterial_set[object.material_index];
     vec3 color  = material.intensity*material.color;
     return vec4(color,1.0);
 }
 
 vec4 shade_blinn_phong(inout Ray r){
 
-    Sphere object = object_set[r.object];
-    BlinnPhongMaterial material = blinnPhong_set[object.material];
+    Sphere object = object_set[r.object_index];
+    BlinnPhongMaterial material = blinnPhong_set[object.material_index];
     
     vec3 color = vec3(0.0,0.0,0.0);
     vec3 intersectionPosition = r.origin + r.t*r.direction;
@@ -215,7 +216,7 @@ vec4 shade_blinn_phong(inout Ray r){
     vec3 n = normalize(intersectionPosition - object.centre);
     for(int i = 0; i < num_lights; i++ ){
         PointLight light = light_set[i]; 
-        LightMaterial lightMaterial = lightMaterial_set[light.lightMaterial];
+        LightMaterial lightMaterial = lightMaterial_set[light.lightMaterial_index];
 
         vec3 l = normalize(light.position - intersectionPosition);
         vec3 h = normalize(v+l);
@@ -225,7 +226,7 @@ vec4 shade_blinn_phong(inout Ray r){
         shadow_ray.direction = l;
         shadow_ray.t = FLT_MAX;
         shadow_ray.hit = false;
-        shadow_ray.object = -1;
+        shadow_ray.object_index = -1;
 
         for(int i = 0 ; i < num_objects; i++){
            intersect(shadow_ray,i);
@@ -243,11 +244,7 @@ vec4 shade_blinn_phong(inout Ray r){
                   material.k_d*diff_color + material.k_s*spec_color);
         
         if (shadow_ray.hit){
-            if(object_set[shadow_ray.object].type != LIGHT){
-                color = color + material.k_a*ambient_color;
-            } else {
-                color = color + L;
-            }
+            color = color + material.k_a*ambient_color;
         } else {
             color = color + L;
         }
@@ -274,12 +271,12 @@ void intersect(inout Ray r, int index) {
     if(t1 < r.t && t1 > SMALLEST_DIST){
         r.hit = true;
         r.t = t1;
-        r.object = index;
+        r.object_index = index;
     }
 
     if(t2 < r.t && t2 > SMALLEST_DIST){
         r.hit = true;
         r.t = t2;
-        r.object = index;
+        r.object_index = index;
     }
 }
