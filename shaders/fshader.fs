@@ -40,7 +40,7 @@ struct Ray {
         vec3 direction;
         float t;
         bool hit;
-        int object_index;
+        int hit_object_index;
 };
 
 struct PointLight{
@@ -177,14 +177,14 @@ void main() {
     r.direction = normalize(dir);
     r.t = FLT_MAX;
     r.hit = false;
-    r.object_index = -1;
+    r.hit_object_index = -1;
     
     for(int i = 0 ; i < num_objects+num_lights; i++){
         intersect(r,i);
     }
 
     if (r.hit){
-        switch(object_set[r.object_index].type_enum){
+        switch(object_set[r.hit_object_index].type_enum){
             
             case BLINN_PHONG:
                 color = shade_blinn_phong(r);
@@ -199,7 +199,7 @@ void main() {
 };
 
 vec4 shade_light(inout Ray r){
-    Sphere object = object_set[r.object_index];
+    Sphere object = object_set[r.hit_object_index];
     LightMaterial material = lightMaterial_set[object.material_index];
     vec3 color  = material.intensity*material.color;
     return vec4(color,1.0);
@@ -207,7 +207,7 @@ vec4 shade_light(inout Ray r){
 
 vec4 shade_blinn_phong(inout Ray r){
 
-    Sphere object = object_set[r.object_index];
+    Sphere object = object_set[r.hit_object_index];
     BlinnPhongMaterial material = blinnPhong_set[object.material_index];
     
     vec3 color = vec3(0.0,0.0,0.0);
@@ -226,7 +226,7 @@ vec4 shade_blinn_phong(inout Ray r){
         shadow_ray.direction = l;
         shadow_ray.t = FLT_MAX;
         shadow_ray.hit = false;
-        shadow_ray.object_index = -1;
+        shadow_ray.hit_object_index = -1;
 
         for(int i = 0 ; i < num_objects; i++){
            intersect(shadow_ray,i);
@@ -271,12 +271,12 @@ void intersect(inout Ray r, int index) {
     if(t1 < r.t && t1 > SMALLEST_DIST){
         r.hit = true;
         r.t = t1;
-        r.object_index = index;
+        r.hit_object_index = index;
     }
 
     if(t2 < r.t && t2 > SMALLEST_DIST){
         r.hit = true;
         r.t = t2;
-        r.object_index = index;
+        r.hit_object_index = index;
     }
 }
