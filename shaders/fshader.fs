@@ -1,5 +1,6 @@
 #version 330 core
 
+
 float M_PI = radians(180.0);
 
 in vec4 gl_FragCoord;
@@ -27,30 +28,12 @@ float t = FLT_MAX;
 
 out vec4 color;
 
-struct PointLight{
-    vec3 position;
-    vec3 intensity;
-    vec3 color;
-};
-
 struct World{
     vec3 bgcolor;
+    vec3 ambient_color;
+    float ambience;
 };
-
-struct BasicMaterial{
-    //
-    float k_a;
-    vec3 c_a; //ambient color
-    
-    //Diffuse
-    float k_d;
-    vec3 c_r; //diffuse reflectance
-    
-    //Specular
-    float k_s; 
-    vec3 c_p; // phong highlight
-    int n; // phong exponent
-};
+World world;
 
 struct Ray {
         vec3 origin;
@@ -63,60 +46,118 @@ struct Ray {
 struct Sphere {
         vec3 centre;
         float radius;
+        int type;
         int material;
 };
 
-const int num_materials = 2;
-const int num_objects = 3;
-const int num_lights = 2;
-
-BasicMaterial material_set[num_materials];
+const int num_objects = 6;
 Sphere object_set[num_objects];
+
+const int LIGHT = 0;
+const int BLINN_PHONG = 1;
+const int REFLECTIVE = 2;
+const int REFRACTIVE = 3;
+
+struct PointLight{
+    vec3 position;
+    int lightMaterial;
+};
+
+const int num_lights = 2;
 PointLight light_set[num_lights];
-World world;
+struct LightMaterial{
+    vec3 intensity;
+    vec3 color;
+};
+const int num_lightMaterial = 2;
+LightMaterial lightMaterial_set[num_lightMaterial];
+
+
+struct BlinnPhongMaterial{
+
+    float k_a;
+    vec3 c_a; //ambient color
+    
+    //Diffuse
+    float k_d;
+    vec3 c_r; //diffuse reflectance
+    
+    //Specular
+    float k_s; 
+    vec3 c_p; // phong highlight
+    int n; // phong exponent
+};
+const int num_blinnPhongMaterial = 2;
+BlinnPhongMaterial blinnPhong_set[num_blinnPhongMaterial];
+
+
+
 void intersect(inout Ray r, int s);
-vec4 shade(inout Ray r);
+vec4 shade_blinn_phong(inout Ray r);
+vec4 shade_light(inout Ray r);
 
 void main() {
 
-    world.bgcolor = vec3(0.28, 0.28, 0.28);
+    world.bgcolor = vec3(0.28,0.28,0.28);
+    world.ambient_color = vec3(0.28,0.28,0.28);
+    world.ambience = 0.8;
 
-    material_set[0].k_a = 0.3;
-    material_set[0].c_a =  vec3(1.0, 0.43, 0.14);
-    material_set[0].k_d = 0.8;
-    material_set[0].c_r = vec3(1.0, 0.43, 0.14); 
-    material_set[0].k_s = 0.2; 
-    material_set[0].c_p = vec3(1.0,1.0,1.0); 
-    material_set[0].n = 2; 
+    blinnPhong_set[0].k_a = 0.3;
+    blinnPhong_set[0].c_a =  vec3(1.0, 0.43, 0.14);
+    blinnPhong_set[0].k_d = 0.8;
+    blinnPhong_set[0].c_r = vec3(1.0, 0.43, 0.14); 
+    blinnPhong_set[0].k_s = 0.2; 
+    blinnPhong_set[0].c_p = vec3(1.0,1.0,1.0); 
+    blinnPhong_set[0].n = 2; 
 
-    material_set[1].k_a = 0.3;
-    material_set[1].c_a =  vec3(1.0, 0.0, 0.9);
-    material_set[1].k_d = 0.2;
-    material_set[1].c_r = vec3(0.0, 0.0, 1.0); 
-    material_set[1].k_s = 0.9; 
-    material_set[1].c_p = vec3(1.0,1.0,1.0); 
-    material_set[1].n = 100; 
+    blinnPhong_set[1].k_a = 0.3;
+    blinnPhong_set[1].c_a =  vec3(1.0, 0.0, 0.9);
+    blinnPhong_set[1].k_d = 0.2;
+    blinnPhong_set[1].c_r = vec3(0.0, 0.0, 1.0); 
+    blinnPhong_set[1].k_s = 0.9; 
+    blinnPhong_set[1].c_p = vec3(1.0,1.0,1.0); 
+    blinnPhong_set[1].n = 100; 
 
-    object_set[0].centre = vec3(2, 0, 0);
+    light_set[0].position = vec3(0,10,10);
+    light_set[0].lightMaterial = 0;
+    lightMaterial_set[0].intensity = vec3(1.0,1.0,1.0);
+    lightMaterial_set[0].color = vec3(1.0,1.0,1.0);
+
+    light_set[1].position = vec3(-10,10,10);
+    light_set[1].lightMaterial = 1;
+    lightMaterial_set[1].intensity = vec3(1.0,1.0,1.0);
+    lightMaterial_set[1].color = vec3(1.0,1.0,1.0);
+
+    object_set[0].centre = vec3(0, 0, 0);
     object_set[0].radius = 1;
+    object_set[0].type = BLINN_PHONG;
     object_set[0].material = 0;
 
     object_set[1].centre = vec3(-2, 0, 0);
     object_set[1].radius = 1;
+    object_set[1].type = BLINN_PHONG;
     object_set[1].material = 1;   
 
-    object_set[2].centre = vec3(0, 2, 0);
+    object_set[2].centre = vec3(0, 2, 2);
     object_set[2].radius = 1;
+    object_set[2].type = BLINN_PHONG;
     object_set[2].material = 1;   
-
-    light_set[0].position = vec3(0,10,10);
-    light_set[0].intensity = vec3(1.0,1.0,1.0);
-    light_set[0].color = vec3(1.0,1.0,1.0);
-
-    light_set[1].position = vec3(-10,10,10);
-    light_set[1].intensity = vec3(1.0,1.0,1.0);
-    light_set[1].color = vec3(1.0,0.0,0.0);
     
+    object_set[3].centre = light_set[0].position;
+    object_set[3].radius = 0.1;
+    object_set[3].type = LIGHT;
+    object_set[3].material = 0;   
+    
+    object_set[4].centre = light_set[1].position;
+    object_set[4].radius = 0.1;
+    object_set[4].type = LIGHT;
+    object_set[4].material = 1;   
+
+    object_set[5].centre = camera_target;
+    object_set[5].radius = 0.1;
+    object_set[5].type = BLINN_PHONG;
+    object_set[5].material = 0;   
+
     vec3 line_of_sight = camera_target - cameraPos;
     vec3 w = -normalize(line_of_sight);
     vec3 u = normalize(cross(camera_up, w));
@@ -142,16 +183,31 @@ void main() {
     }
 
     if (r.hit){
-        color = shade(r);
+        switch(object_set[r.object].type){
+            
+            case BLINN_PHONG:
+                color = shade_blinn_phong(r);
+                break;
+
+            case  LIGHT:
+                color = shade_light(r);
+        }
     } else {
         color = vec4(world.bgcolor,1.0);
     }
 };
 
-vec4 shade(inout Ray r){
+vec4 shade_light(inout Ray r){
+    Sphere object = object_set[r.object];
+    LightMaterial material = lightMaterial_set[object.material];
+    vec3 color  = material.intensity*material.color;
+    return vec4(color,1.0);
+}
+
+vec4 shade_blinn_phong(inout Ray r){
 
     Sphere object = object_set[r.object];
-    BasicMaterial material = material_set[object.material];
+    BlinnPhongMaterial material = blinnPhong_set[object.material];
     
     vec3 color = vec3(0.0,0.0,0.0);
     vec3 intersectionPosition = r.origin + r.t*r.direction;
@@ -159,20 +215,42 @@ vec4 shade(inout Ray r){
     vec3 n = normalize(intersectionPosition - object.centre);
     for(int i = 0; i < num_lights; i++ ){
         PointLight light = light_set[i]; 
+        LightMaterial lightMaterial = lightMaterial_set[light.lightMaterial];
+
         vec3 l = normalize(light.position - intersectionPosition);
         vec3 h = normalize(v+l);
+        
+        Ray shadow_ray;
+        shadow_ray.origin = intersectionPosition;
+        shadow_ray.direction = l;
+        shadow_ray.t = FLT_MAX;
+        shadow_ray.hit = false;
+        shadow_ray.object = -1;
 
+        for(int i = 0 ; i < num_objects; i++){
+           intersect(shadow_ray,i);
+        }
+        
         float diff = max(dot(n,l),0);
-        vec3 diff_color = material.c_r*light.color*diff;
+        vec3 diff_color = material.c_r*lightMaterial.color*diff;
 
-        vec3 ambient_color = material.c_r*material.c_a;
+        vec3 ambient_color = material.c_r*material.c_a + world.ambience*world.ambient_color;
 
         float spec = pow(max(dot(n,h),0),material.n);  
-        vec3 spec_color = spec*material.c_p*light.color;
+        vec3 spec_color = spec*material.c_p*lightMaterial.color;
 
-        vec3 L = light.intensity*(material.k_a*ambient_color + 
+        vec3 L = lightMaterial.intensity*(material.k_a*ambient_color + 
                   material.k_d*diff_color + material.k_s*spec_color);
-        color = color + L;
+        
+        if (shadow_ray.hit){
+            if(object_set[shadow_ray.object].type != LIGHT){
+                color = color + material.k_a*ambient_color;
+            } else {
+                color = color + L;
+            }
+        } else {
+            color = color + L;
+        }
     }
     return vec4(color,1.0);
 }
