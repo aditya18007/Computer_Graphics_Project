@@ -70,8 +70,8 @@ struct Square {
 //        |          |
 //        |          |
 //        C----------B
-
-const int num_squares = 2;
+// Normal coming out of screen
+const int num_squares = 1;
 Square square_set[num_squares];
 
 struct Sphere {
@@ -138,43 +138,34 @@ void material_setup(){
     blinnPhong_set[i].c_r = vec3(0.0, 0.0, 1.0); 
     blinnPhong_set[i].k_s = 0.9; 
     blinnPhong_set[i].c_p = vec3(1.0,1.0,1.0); 
-    blinnPhong_set[i].n = 100; 
-    i++;
+    blinnPhong_set[i++].n = 100; 
+    
     blinnPhong_set[i].k_a = 0.3;
     blinnPhong_set[i].c_a =  vec3(1.0, 0.43, 0.14);
     blinnPhong_set[i].k_d = 0.8;
     blinnPhong_set[i].c_r = vec3(1.0, 0.43, 0.14); 
     blinnPhong_set[i].k_s = 0.2; 
     blinnPhong_set[i].c_p = vec3(1.0,1.0,1.0); 
-    blinnPhong_set[i].n = 2; 
+    blinnPhong_set[i++].n = 2; 
 }
 
 void light_setup(){
     int i = 0;
-    light_set[i].position = vec3(0,10,10);
+    light_set[i].position = cameraPos;
     light_set[i].intensity = vec3(1.0,1.0,1.0);
-    light_set[i].color = vec3(1.0,1.0,1.0);
-    i++;
+    light_set[i++].color = vec3(1.0,1.0,1.0);
+    
     light_set[i].position = vec3(-10,10,10);
     light_set[i].intensity = vec3(1.0,1.0,1.0);
-    light_set[i].color = vec3(1.0,1.0,1.0);
+    light_set[i++].color = vec3(1.0,1.0,1.0);
 }
 
 void square_setup(){
     int i = 0;
-    square_set[i].A = vec3(1.0,1.0,-5.0);
-    square_set[i].B = vec3(1.0,-1.0,-5.0);
-    square_set[i].C = vec3(-1.0,-1.0,-5.0);
-    square_set[i].D = vec3(-1.0,1.0,-5.0);
-    square_set[i].normal = cross(
-        square_set[i].A - square_set[i].B,
-        square_set[i].D - square_set[i].A
-    );
-    i++;
-    square_set[i].A = vec3(1.0,1.0,0.0);
-    square_set[i].B = vec3(1.0,-1.0,0.0);
-    square_set[i].C = vec3(-1.0,-1.0,0.0);
-    square_set[i].D = vec3(-1.0,1.0,0.0);
+    square_set[i].A = vec3(  2.0 ,  2.0, -2.0);
+    square_set[i].B = vec3(  2.0 , -2.0, -2.0);
+    square_set[i].C = vec3( -2.0 , -2.0, -2.0);
+    square_set[i].D = vec3( -2.0 ,  2.0, -2.0);
     square_set[i].normal = cross(
         square_set[i].A - square_set[i].B,
         square_set[i].D - square_set[i].A
@@ -183,44 +174,41 @@ void square_setup(){
 
 void sphere_setup(){
     int i = 0;
-    sphere_set[i].centre = vec3(0.1,0.1,-4.9);
-    sphere_set[i].radius = 1.0;
-    i++;
-    sphere_set[i].centre = vec3(0.0,0.0,0.0);
-    sphere_set[i].radius = 1.0;
+    sphere_set[i].centre = vec3(0.0,2.0,-2.0);
+    sphere_set[i++].radius = 1.0;
+
+    sphere_set[i].centre = vec3(0.0,0.0,-2.0);
+    sphere_set[i++].radius = 1.0;
 }
 
 void object_setup(){
     int i = 0;
 
+    int i_square = 0;
+    //Back
     object_set[i].object_type = SQUARE;
-    object_set[i].object_index = 0;
-    object_set[i].material_type = BLINN_PHONG;
-    object_set[i].material_index = 0;
-    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
-    object_set[i].normal = vec3(0.0,0.0,0.0);
-    i++;
-    object_set[i].object_type = SQUARE;
-    object_set[i].object_index = 1;
-    object_set[i].material_type = BLINN_PHONG;
-    object_set[i].material_index = 0;
-    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
-    object_set[i].normal = vec3(0.0,0.0,0.0);
-    square_setup();
-    i++;
-    object_set[i].object_type = SPHERE;
-    object_set[i].object_index = 0;
+    object_set[i].object_index = i_square++;
     object_set[i].material_type = BLINN_PHONG;
     object_set[i].material_index = 1;
     object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
-    object_set[i].normal = vec3(0.0,0.0,0.0);
-    i++;
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+    
+    square_setup();
+
+    int i_sphere = 0;
     object_set[i].object_type = SPHERE;
-    object_set[i].object_index = 1;
+    object_set[i].object_index = i_sphere++;
+    object_set[i].material_type = BLINN_PHONG;
+    object_set[i].material_index = 1;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+
+    object_set[i].object_type = SPHERE;
+    object_set[i].object_index = i_sphere++;
     object_set[i].material_type = BLINN_PHONG;
     object_set[i].material_index = 0;
     object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
-    object_set[i].normal = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
     sphere_setup();
 }
 void static_setup(){
@@ -345,7 +333,7 @@ void intersect_square(inout Ray r, int square_index, int object_index){
     vec3 intersection_point = e+t*d;
     vec3 v = intersection_point - p1;
     vec3 e1 = sqr.D-sqr.A;
-    vec3 e2 = sqr.A-sqr.B;
+    vec3 e2 = sqr.B-sqr.A;
     float width = length(e1);
     float height = length(e2);
     float proj1 = dot(v,e1)/width;
