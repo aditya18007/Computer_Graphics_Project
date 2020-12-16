@@ -8,25 +8,22 @@ in vec4 gl_FragCoord;
 uniform vec3 cameraPos;
 uniform vec3 camera_target;
 
-// vec3 cameraPos = vec3(0,10,10);
-// vec3 camera_target = vec3(0,0,0);
+const int SCR_WIDTH = 1800;
+const int SCR_HEIGHT = 1000;
 
-int SCR_WIDTH = 1800;
-int SCR_HEIGHT = 1000;
+const vec3 camera_up = vec3(0.0, 1.0, 0.0);
 
-vec3 camera_up = vec3(0.0, 1.0, 0.0);
-
-float camera_fovy =  45.0;
-float focalHeight = 1.0;
+const float camera_fovy =  45.0;
+const float focalHeight = 1.0;
 float aspect = float(SCR_WIDTH)/float(SCR_HEIGHT);
 float focalWidth = focalHeight * aspect; //Height * Aspect ratio
 float focalDistance = focalHeight/(2.0 * tan(camera_fovy * M_PI/(180.0 * 2.0)));
 
-float SMALLEST_DIST = 1e-4;
-float FLT_MAX =  3.402823466e+38;
-float t = FLT_MAX;
+const float SMALLEST_DIST = 1e-4;
+const float FLT_MAX =  3.402823466e+38;
+const float t = FLT_MAX;
 
-out vec4 color;
+out vec4 pixel_color;
 
 struct World{
     vec3 bgcolor;
@@ -43,36 +40,49 @@ struct Ray {
         int hit_object_index;
 };
 
-struct PointLight{
-    vec3 position;
-    int lightMaterial_index;
-};
+//Object Type
+const int SQUARE = 1;
+const int SPHERE = 2;
 
-const int num_lights = 2;
-PointLight light_set[num_lights];
-struct LightMaterial{
-    vec3 intensity;
-    vec3 color;
-};
-const int num_lightMaterial = 2;
-
-LightMaterial lightMaterial_set[num_lightMaterial];    
-struct Sphere {
-        vec3 centre;
-        float radius;
-        int type_enum;
-        int material_index;
-};
-
-const int num_objects = 4;
-Sphere object_set[num_objects+num_lights];
-// All lights are at the end of array
-
-const int LIGHT = 0;
+//Material Type
 const int BLINN_PHONG = 1;
 const int REFLECTIVE = 2;
 const int REFRACTIVE = 3;
 
+struct Object{
+    int object_type;
+    int object_index;
+    int material_type;
+    int material_index;
+    vec3 point_of_intersection;
+    vec3 normal;
+};
+
+struct Square {
+        vec3 A;
+        vec3 B;
+        vec3 C;
+        vec3 D;
+        vec3 normal;
+};
+
+//        D----------A
+//        |          |
+//        |          |
+//        C----------B
+
+const int num_squares = 1;
+Square square_set[num_squares];
+
+struct Sphere {
+        vec3 centre;
+        float radius;
+};
+const int num_spheres = 1;
+Sphere sphere_set[num_spheres];
+
+const int num_objects = num_squares+num_spheres;
+Object object_set[num_objects];
 
 struct BlinnPhongMaterial{
 
@@ -88,77 +98,111 @@ struct BlinnPhongMaterial{
     vec3 c_p; // phong highlight
     int n; // phong exponent
 };
+
+struct PointLight{
+    vec3 position;
+    vec3 intensity;
+    vec3 color;
+};
+
+const int num_lights = 2;
+PointLight light_set[num_lights];
+
 const int num_blinnPhongMaterial = 2;
 BlinnPhongMaterial blinnPhong_set[num_blinnPhongMaterial];
 
-
-
-void intersect(inout Ray r, int s);
+void intersect_sphere(inout Ray r, int sphere_index, int object_index);
+void intersect_square(inout Ray r, int square_index, int object_index);
 vec4 shade_blinn_phong(inout Ray r);
-vec4 shade_light(inout Ray r);
 
-void main() {
+Ray new_ray(vec3 e, vec3 d){
+    Ray r;
+    r.origin = e;
+    r.direction = normalize(d);
+    r.t = FLT_MAX;
+    r.hit = false;
+    r.hit_object_index = -1;
+    return r;
+}
 
+void world_setup(){
     world.bgcolor = vec3(0.28,0.28,0.28);
     world.ambient_color = vec3(0.28,0.28,0.28);
     world.ambience = 0.8;
+}
+void material_setup(){
 
     blinnPhong_set[0].k_a = 0.3;
-    blinnPhong_set[0].c_a =  vec3(1.0, 0.43, 0.14);
-    blinnPhong_set[0].k_d = 0.8;
-    blinnPhong_set[0].c_r = vec3(1.0, 0.43, 0.14); 
-    blinnPhong_set[0].k_s = 0.2; 
+    blinnPhong_set[0].c_a =  vec3(1.0, 0.0, 0.9);
+    blinnPhong_set[0].k_d = 0.2;
+    blinnPhong_set[0].c_r = vec3(0.0, 0.0, 1.0); 
+    blinnPhong_set[0].k_s = 0.9; 
     blinnPhong_set[0].c_p = vec3(1.0,1.0,1.0); 
-    blinnPhong_set[0].n = 2; 
+    blinnPhong_set[0].n = 100; 
 
     blinnPhong_set[1].k_a = 0.3;
-    blinnPhong_set[1].c_a =  vec3(1.0, 0.0, 0.9);
-    blinnPhong_set[1].k_d = 0.2;
-    blinnPhong_set[1].c_r = vec3(0.0, 0.0, 1.0); 
-    blinnPhong_set[1].k_s = 0.9; 
+    blinnPhong_set[1].c_a =  vec3(1.0, 0.43, 0.14);
+    blinnPhong_set[1].k_d = 0.8;
+    blinnPhong_set[1].c_r = vec3(1.0, 0.43, 0.14); 
+    blinnPhong_set[1].k_s = 0.2; 
     blinnPhong_set[1].c_p = vec3(1.0,1.0,1.0); 
-    blinnPhong_set[1].n = 100; 
+    blinnPhong_set[1].n = 2; 
+}
 
+void light_setup(){
     light_set[0].position = vec3(0,10,10);
-    light_set[0].lightMaterial_index = 0;
-    lightMaterial_set[0].intensity = vec3(1.0,1.0,1.0);
-    lightMaterial_set[0].color = vec3(1.0,1.0,1.0);
+    light_set[0].intensity = vec3(1.0,1.0,1.0);
+    light_set[0].color = vec3(1.0,1.0,1.0);
 
     light_set[1].position = vec3(-10,10,10);
-    light_set[1].lightMaterial_index = 1;
-    lightMaterial_set[1].intensity = vec3(1.0,1.0,1.0);
-    lightMaterial_set[1].color = vec3(1.0,1.0,1.0);
+    light_set[1].intensity = vec3(1.0,1.0,1.0);
+    light_set[1].color = vec3(1.0,1.0,1.0);
+}
 
-    object_set[0].centre = vec3(0, 0, 0);
-    object_set[0].radius = 1;
-    object_set[0].type_enum = BLINN_PHONG;
+void square_setup(){
+    square_set[0].A = vec3(1.0,1.0,-5.0);
+    square_set[0].B = vec3(1.0,-1.0,-5.0);
+    square_set[0].C = vec3(-1.0,-1.0,-5.0);
+    square_set[0].D = vec3(-1.0,1.0,-5.0);
+    square_set[0].normal = cross(
+        square_set[0].A - square_set[0].B,
+        square_set[0].D - square_set[0].A
+    );
+}
+
+void sphere_setup(){
+    sphere_set[0].centre = vec3(0.1,0.1,-4.9);
+    sphere_set[0].radius = 1.0;
+}
+
+void object_setup(){
+    int i = 0;
+    int count = 0;
+
+    object_set[0].object_type = SQUARE;
+    object_set[0].object_index = 0;
+    object_set[0].material_type = BLINN_PHONG;
     object_set[0].material_index = 0;
+    object_set[0].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[0].normal = vec3(0.0,0.0,0.0);
+    square_setup();
 
-    object_set[1].centre = vec3(-2, 0, 0);
-    object_set[1].radius = 1;
-    object_set[1].type_enum = BLINN_PHONG;
-    object_set[1].material_index = 1;   
+    object_set[1].object_type = SPHERE;
+    object_set[1].object_index = 0;
+    object_set[1].material_type = BLINN_PHONG;
+    object_set[1].material_index = 1;
+    object_set[1].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[1].normal = vec3(0.0,0.0,0.0);
+    sphere_setup();
+}
+void static_setup(){
+    world_setup();
+    material_setup();
+    light_setup();
+    object_setup();
+}
 
-    object_set[2].centre = vec3(0, 2, 2);
-    object_set[2].radius = 1;
-    object_set[2].type_enum = BLINN_PHONG;
-    object_set[2].material_index = 1;   
-    
-    object_set[3].centre = camera_target;
-    object_set[3].radius = 0.1;
-    object_set[3].type_enum = BLINN_PHONG;
-    object_set[3].material_index = 0;   
-
-    object_set[4].centre = light_set[0].position;
-    object_set[4].radius = 0.1;
-    object_set[4].type_enum = LIGHT;
-    object_set[4].material_index = 0;   
-    
-    object_set[5].centre = light_set[1].position;
-    object_set[5].radius = 0.1;
-    object_set[5].type_enum = LIGHT;
-    object_set[5].material_index = 1;   
-
+Ray getMainRay(){
     vec3 line_of_sight = camera_target - cameraPos;
     vec3 w = -normalize(line_of_sight);
     vec3 u = normalize(cross(camera_up, w));
@@ -172,78 +216,79 @@ void main() {
 	dir += u * xw;
 	dir += v * yw;
     
-    Ray r;
-    r.origin = cameraPos;
-    r.direction = normalize(dir);
-    r.t = FLT_MAX;
-    r.hit = false;
-    r.hit_object_index = -1;
-    
-    for(int i = 0 ; i < num_objects+num_lights; i++){
-        intersect(r,i);
-    }
+    return new_ray(cameraPos,dir);
+}
 
-    if (r.hit){
-        switch(object_set[r.hit_object_index].type_enum){
-            
-            case BLINN_PHONG:
-                color = shade_blinn_phong(r);
+void main() {
+    static_setup();
+    Ray R = getMainRay();
+    for(int i = 0 ; i < num_objects ; i++){
+        switch(object_set[i].object_type){
+            case SQUARE:
+                intersect_square(R, 
+                object_set[i].object_index,
+                i);
                 break;
-
-            case  LIGHT:
-                color = shade_light(r);
+            
+            case SPHERE:
+                intersect_sphere(R,
+                object_set[i].object_index,
+                i);
+                break;
+        }
+    }
+    if(R.hit){
+        switch(object_set[R.hit_object_index].material_type){
+            case BLINN_PHONG:
+                pixel_color = shade_blinn_phong(R);
+                break;
         }
     } else {
-        color = vec4(world.bgcolor,1.0);
+        pixel_color = vec4(world.bgcolor,1.0);
     }
-};
-
-vec4 shade_light(inout Ray r){
-    Sphere object = object_set[r.hit_object_index];
-    LightMaterial material = lightMaterial_set[object.material_index];
-    vec3 color  = material.intensity*material.color;
-    return vec4(color,1.0);
 }
 
 vec4 shade_blinn_phong(inout Ray r){
-
-    Sphere object = object_set[r.hit_object_index];
+    Object object = object_set[r.hit_object_index];
     BlinnPhongMaterial material = blinnPhong_set[object.material_index];
-    
     vec3 color = vec3(0.0,0.0,0.0);
-    vec3 intersectionPosition = r.origin + r.t*r.direction;
-    vec3 v = normalize(r.origin-intersectionPosition);
-    vec3 n = normalize(intersectionPosition - object.centre);
+    vec3 point_of_intersection = object.point_of_intersection;
+
+    vec3 v = normalize(r.origin-point_of_intersection);
+    vec3 n = normalize(object.normal);
     for(int i = 0; i < num_lights; i++ ){
         PointLight light = light_set[i]; 
-        LightMaterial lightMaterial = lightMaterial_set[light.lightMaterial_index];
-
-        vec3 l = normalize(light.position - intersectionPosition);
+        vec3 l = normalize(light.position - point_of_intersection);
         vec3 h = normalize(v+l);
-        
-        Ray shadow_ray;
-        shadow_ray.origin = intersectionPosition;
-        shadow_ray.direction = l;
-        shadow_ray.t = FLT_MAX;
-        shadow_ray.hit = false;
-        shadow_ray.hit_object_index = -1;
 
-        for(int i = 0 ; i < num_objects; i++){
-           intersect(shadow_ray,i);
-        }
-        
         float diff = max(dot(n,l),0);
-        vec3 diff_color = material.c_r*lightMaterial.color*diff;
+        vec3 diff_color = material.c_r*diff;
 
-        vec3 ambient_color = material.c_r*material.c_a + world.ambience*world.ambient_color;
+        vec3 ambient_color = material.c_a;
 
         float spec = pow(max(dot(n,h),0),material.n);  
-        vec3 spec_color = spec*material.c_p*lightMaterial.color;
+        vec3 spec_color = spec*material.c_p;
 
-        vec3 L = lightMaterial.intensity*(material.k_a*ambient_color + 
+        vec3 L = light.intensity*(material.k_a*ambient_color + 
                   material.k_d*diff_color + material.k_s*spec_color);
         
-        if (shadow_ray.hit){
+        Ray shadow_ray = new_ray(point_of_intersection,l);
+        for(int i = 0 ; i < num_objects ; i++){
+            switch(object_set[i].object_type){
+                case SQUARE:
+                    intersect_square(shadow_ray, 
+                    object_set[i].object_index,
+                    i);
+                    break;
+                
+                case SPHERE:
+                    intersect_sphere(shadow_ray,
+                    object_set[i].object_index,
+                    i);
+                    break;
+            }
+        }
+        if(shadow_ray.hit){
             color = color + material.k_a*ambient_color;
         } else {
             color = color + L;
@@ -251,8 +296,49 @@ vec4 shade_blinn_phong(inout Ray r){
     }
     return vec4(color,1.0);
 }
-void intersect(inout Ray r, int index) {
-    Sphere s = object_set[index];
+void intersect_square(inout Ray r, int square_index, int object_index){
+    Square sqr = square_set[square_index];
+    vec3 p1 = sqr.A;
+    vec3 e = r.origin;
+    vec3 d = r.direction;
+    vec3 n = sqr.normal;
+    float t = dot(p1-e,n)/dot(d,n);
+    if (t < 0){
+        return;
+    }
+    if(t < SMALLEST_DIST){
+        return;
+    }
+
+    if (t >= r.t){
+        return;
+    }
+
+    vec3 intersection_point = e+t*d;
+    vec3 v = intersection_point - p1;
+    vec3 e1 = sqr.D-sqr.A;
+    vec3 e2 = sqr.A-sqr.B;
+    float width = length(e1);
+    float height = length(e2);
+    float proj1 = dot(v,e1)/width;
+    float proj2 = dot(v,e2)/height;
+    if(proj1 < 0){
+        return;
+    }
+    if (proj2 < 0){
+        return;
+    }
+    if((proj1 < width ) && (proj2 < height)){
+        r.hit = true;
+        r.t = t;
+        r.hit_object_index = object_index; 
+        object_set[object_index].point_of_intersection = intersection_point;
+        object_set[object_index].normal = n;
+    }
+}
+
+void intersect_sphere(inout Ray r, int sphere_index, int object_index) {
+    Sphere s = sphere_set[sphere_index];
     float a = dot(r.direction,r.direction);
     float b = dot(r.direction, 2.0 * (r.origin-s.centre));
     float c = dot(s.centre, s.centre) + dot(r.origin,r.origin) +
@@ -268,15 +354,24 @@ void intersect(inout Ray r, int index) {
 	float t1 = (-b +D)/(2.0*a);
 	float t2 = (-b -D)/(2.0*a);
 
+    vec3 e = r.origin;
+    vec3 d = r.direction;
+    
     if(t1 < r.t && t1 > SMALLEST_DIST){
         r.hit = true;
         r.t = t1;
-        r.hit_object_index = index;
+        r.hit_object_index = object_index;    
+        vec3 intersection_point = e+t1*d; 
+        object_set[object_index].point_of_intersection = intersection_point;
+        object_set[object_index].normal = intersection_point-s.centre;
     }
 
     if(t2 < r.t && t2 > SMALLEST_DIST){
         r.hit = true;
         r.t = t2;
-        r.hit_object_index = index;
+        r.hit_object_index = object_index;
+        vec3 intersection_point = e+t2*d; 
+        object_set[object_index].point_of_intersection = intersection_point;
+        object_set[object_index].normal = intersection_point-s.centre;
     }
 }
