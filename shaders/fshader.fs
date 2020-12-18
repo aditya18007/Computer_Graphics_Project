@@ -19,6 +19,8 @@ float aspect = float(SCR_WIDTH)/float(SCR_HEIGHT);
 float focalWidth = focalHeight * aspect; //Height * Aspect ratio
 float focalDistance = focalHeight/(2.0 * tan(camera_fovy * M_PI/(180.0 * 2.0)));
 
+const int MAX_DEPTH= 4;
+
 const float SMALLEST_DIST = 1e-4;
 const vec3 SMALLEST_DIST_vector = vec3(
     SMALLEST_DIST,
@@ -118,6 +120,21 @@ struct ReflectiveMaterial{
 const int num_reflective = 1;
 ReflectiveMaterial reflective_set[num_reflective];
 
+struct RefractiveMaterial{
+    vec3 color;
+    float eta;
+    float ka;
+    float kd;
+    float ks;
+    float n;
+    float ar;
+    float ag;
+    float ab;
+};
+
+const int num_refractive = 1;
+RefractiveMaterial refractive_set[num_refractive];
+
 struct PointLight{
     vec3 position;
     vec3 intensity;
@@ -131,6 +148,7 @@ void intersect_sphere(inout Ray r, int sphere_index, int object_index);
 void intersect_square(inout Ray r, int square_index, int object_index);
 vec4 shade_blinn_phong(inout Ray r);
 vec4 shade_reflective(inout Ray r);
+vec4 shade_refractive(inout Ray r);
 
 Ray new_ray(vec3 e, vec3 d){
     Ray r;
@@ -170,17 +188,27 @@ void material_setup(){
     reflective_set[0].k_s = 0.9;
     reflective_set[0].color = vec3(0.4, 0.4, 0.4);
     reflective_set[0].n = 1000;
+
+    refractive_set[0].color = vec3(0.831,0.686,0.215);
+    refractive_set[0].eta = 1.3;
+    refractive_set[0].n = 32;
+    refractive_set[0].ka = 0.2;
+    refractive_set[0].kd = 0.1;
+    refractive_set[0].ks = 0.7;
+    refractive_set[0].ar = 1;
+    refractive_set[0].ag = 1;
+    refractive_set[0].ab = 1;
 }
 
 void light_setup(){
     int i = 0;
-    light_set[i].position = cameraPos;
-    light_set[i].intensity = vec3(1.0,1.0,1.0);
-    light_set[i++].color = vec3(1.0,1.0,1.0);
+    light_set[i].position = vec3(10,10,10) ;
+    light_set[i].intensity = vec3(1,1,1);
+    light_set[i++].color = vec3(1,1,1);
     
     light_set[i].position = vec3(-10,10,10);
-    light_set[i].intensity = vec3(1.0,1.0,1.0);
-    light_set[i++].color = vec3(1.0,1.0,1.0);
+    light_set[i].intensity = vec3(1,1,1);
+    light_set[i++].color = vec3(1,1,1);
 }
 
 void square_setup(){
@@ -204,11 +232,11 @@ void square_setup(){
         square_set[i].D - square_set[i].A
     );
 
-    //Right
-    square_set[++i].A = vec3(  4.0 ,  4.0,  4.0);
-    square_set[i].B   = vec3(  4.0 , -4.0,  4.0);
-    square_set[i].C   = vec3(  4.0 , -4.0, -4.0);
-    square_set[i].D   = vec3(  4.0 ,  4.0, -4.0);
+    //Bottom
+    square_set[++i].A = vec3( -4.0 , -4.0, -4.0);
+    square_set[i].B   = vec3(  4.0 , -4.0, -4.0);
+    square_set[i].C   = vec3(  4.0 , -4.0,  4.0);
+    square_set[i].D   = vec3( -4.0 , -4.0,  4.0);
     square_set[i].normal = cross(
         square_set[i].A - square_set[i].B,
         square_set[i].D - square_set[i].A
@@ -236,16 +264,16 @@ void object_setup(){
     //Left
     object_set[i].object_type = SQUARE;
     object_set[i].object_index = i_square++;
-    object_set[i].material_type = BLINN_PHONG;
+    object_set[i].material_type = REFLECTIVE;
     object_set[i].material_index = 0;
     object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
     object_set[i++].normal = vec3(0.0,0.0,0.0);
 
-    //Right
+    //Bottom
     object_set[i].object_type = SQUARE;
     object_set[i].object_index = i_square++;
-    object_set[i].material_type = BLINN_PHONG;
-    object_set[i].material_index = 1;
+    object_set[i].material_type = REFLECTIVE;
+    object_set[i].material_index = 0;
     object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
     object_set[i++].normal = vec3(0.0,0.0,0.0);
     square_setup();
@@ -284,25 +312,31 @@ Ray getMainRay(){
     return new_ray(cameraPos,dir);
 }
 
-void main() {
-    static_setup();
-    Ray R = getMainRay();
+bool hit(inout Ray r){
     for(int i = 0 ; i < num_objects ; i++){
         switch(object_set[i].object_type){
+        
             case SQUARE:
-                intersect_square(R, 
+                intersect_square(r, 
                 object_set[i].object_index,
                 i);
                 break;
-            
+                    
             case SPHERE:
-                intersect_sphere(R,
+                intersect_sphere(r,
                 object_set[i].object_index,
                 i);
                 break;
         }
     }
-    if(R.hit){
+    return r.hit;
+}
+
+void main() {
+    static_setup();
+    Ray R = getMainRay();
+    
+    if(hit(R)){
         switch(object_set[R.hit_object_index].material_type){
             case BLINN_PHONG:
                 pixel_color = shade_blinn_phong(R);
@@ -311,64 +345,113 @@ void main() {
             case REFLECTIVE:
                 pixel_color = shade_reflective(R);
                 break;
+            
+            case REFRACTIVE:
+                pixel_color = shade_refractive(R);
         }
     } else {
         pixel_color = vec4(world.bgcolor,1.0);
     }
 }
 
-vec4 shade_reflective(inout Ray r){
+bool refract(vec3 d, vec3 Normal, float eta, inout vec3 T){
+	vec3 n = Normal;
+	float discriminant = 1 - (1.0-pow(dot(d,n),2))/pow(eta,2);
+	if(discriminant < 0){
+		return false;
+	}
+	vec3 c1 = d - n*(dot(d,n));
+	c1 = c1 / eta;
+	T = c1 - n*sqrt(discriminant);
+	return true;
+}
 
-    Object object = object_set[r.hit_object_index];
-    ReflectiveMaterial material = reflective_set[object.material_index];
-    vec3 color = vec3(0.0,0.0,0.0) ;
-    vec3 point_of_intersection = object.point_of_intersection;
+vec4 shade_refractive(inout Ray r){
+    vec3 final_color = vec3(0,0,0);
+    Ray ray = r;
 
-    vec3 v = normalize(r.origin-point_of_intersection);
-    vec3 n = normalize(object.normal);
-    for(int i = 0; i < num_lights; i++ ){
-        PointLight light = light_set[i]; 
-        vec3 l = normalize(light.position - point_of_intersection);
-        vec3 h = normalize(v+l);
+    for(int j = 0 ; j  < MAX_DEPTH ; j++){
+    
+        Object object = object_set[ray.hit_object_index];
+        RefractiveMaterial material = refractive_set[object.material_index];
+        vec3 point_of_intersection = object.point_of_intersection;
+        vec3 v = normalize(ray.origin-point_of_intersection);
+        vec3 n = normalize(object.normal);
+        vec3 color = vec3(0.0,0.0,0.0) ;
+        vec3 d = -v;
+        vec3 r = d - 2*(dot(d,n))*n;
+        vec3 T = vec3(0,0,0);
+        for(int i = 0; i < num_lights; i++ ){
+            PointLight light = light_set[i]; 
+            vec3 l = normalize(light.position - point_of_intersection);
+            vec3 h = normalize(v+l);
 
-        float spec = pow(max(dot(n,h),0),material.n);  
-        vec3 spec_color = spec*light.color;
-        float diff = max(dot(n,l),0);
-        vec3 reflection_direction =  -v - 2*dot(-v,n)*n;
-        Ray reflected_ray_1 = new_ray(point_of_intersection+SMALLEST_DIST_vector,
-            reflection_direction
-        );
-        for(int i = 0 ; i < num_objects ; i++){
-            switch(object_set[i].object_type){
-                case SQUARE:
-                    intersect_square(reflected_ray_1, 
-                    object_set[i].object_index,
-                    i);
-                    break;
-                
-                case SPHERE:
-                    intersect_sphere(reflected_ray_1,
-                    object_set[i].object_index,
-                    i);
-                    break;
-            }
+            float spec = pow(max(dot(n,h),0),material.n);  
+            vec3 spec_color = spec*light.color;
+            float diff = max(dot(n,l),0);
+            vec3 diff_color = material.color*diff;
+            float c = 0;
+            float kr = 0;
+            float kg = 0;
+            float kb = 0;
+            vec3 temp = material.kd*diff_color + material.ks*spec_color;
+            final_color = final_color + temp;
         }
-        if(reflected_ray_1.hit){
-            switch(object_set[reflected_ray_1.hit_object_index].material_type){
-                case BLINN_PHONG:
-                color = color+shade_blinn_phong(reflected_ray_1).xyz;
-                break;
-                
-                case REFLECTIVE:
-                    color = color+material.color*diff;
-                    break;
-            }
-        } else {
-            color = color+material.color*diff; 
-        }
-        color = color + material.k_s*(spec_color*light.color);
     }
-    return vec4(color,1.0);
+    return vec4(final_color,1);
+}
+
+vec4 shade_reflective(inout Ray r){
+    vec3 final_color = vec3(0.0,0.0,0.0);
+    Ray ray = r;
+
+    for(int j = 0 ; j  < MAX_DEPTH ; j++){
+    
+        Object object = object_set[ray.hit_object_index];
+        ReflectiveMaterial material = reflective_set[object.material_index];
+        vec3 point_of_intersection = object.point_of_intersection;
+        vec3 v = normalize(ray.origin-point_of_intersection);
+        vec3 n = normalize(object.normal);
+        vec3 color = vec3(0.0,0.0,0.0) ;
+
+        for(int i = 0; i < num_lights; i++ ){
+    
+            PointLight light = light_set[i]; 
+            vec3 l = normalize(light.position - point_of_intersection);
+            vec3 h = normalize(v+l);
+
+            float spec = pow(max(dot(n,h),0),material.n);  
+            vec3 spec_color = spec*light.color;
+            float diff = max(dot(n,l),0);
+            vec3 diff_color = material.color*diff;
+            vec3 reflection_direction =  -v - 2*dot(-v,n)*n;
+            
+            Ray reflected_ray = new_ray(point_of_intersection+SMALLEST_DIST_vector,
+                reflection_direction
+            );
+
+            if(hit(reflected_ray)){
+                switch(object_set[reflected_ray.hit_object_index].material_type){
+                    case BLINN_PHONG:
+                        color = color+shade_blinn_phong(reflected_ray).xyz;
+                        final_color += color;
+                        return vec4(final_color,1.0);
+                        
+                    case REFLECTIVE:
+                        color = color+material.k_d*diff_color;
+                        ray = reflected_ray;
+                        break;
+                }
+            } else {
+                color = color+material.color; 
+                final_color += color;
+                return vec4(final_color,1.0);
+            }
+            color = color + material.k_s*spec_color;
+            final_color += color;
+        }
+    }
+    return vec4(final_color,1.0);
 }
 
 vec4 shade_blinn_phong(inout Ray r){
@@ -394,28 +477,28 @@ vec4 shade_blinn_phong(inout Ray r){
 
         vec3 L = (material.k_a*ambient_color + 
                   material.k_d*diff_color + material.k_s*spec_color);
-        
-        Ray shadow_ray = new_ray(point_of_intersection+SMALLEST_DIST_vector,l);
-        for(int i = 0 ; i < num_objects ; i++){
-            switch(object_set[i].object_type){
-                case SQUARE:
-                    intersect_square(shadow_ray, 
-                    object_set[i].object_index,
-                    i);
-                    break;
-                
-                case SPHERE:
-                    intersect_sphere(shadow_ray,
-                    object_set[i].object_index,
-                    i);
-                    break;
+
+            Ray shadow_ray = new_ray(point_of_intersection+SMALLEST_DIST_vector,l);
+            for(int i = 0 ; i < num_objects ; i++){
+                switch(object_set[i].object_type){
+                    case SQUARE:
+                        intersect_square(shadow_ray, 
+                        object_set[i].object_index,
+                        i);
+                        break;
+                    
+                    case SPHERE:
+                        intersect_sphere(shadow_ray,
+                        object_set[i].object_index,
+                        i);
+                        break;
+                }
             }
-        }
-        if(shadow_ray.hit){
-            color = color + material.k_a*ambient_color;
-        } else {
-            color = color + L;
-        }
+            if(shadow_ray.hit){
+                color = color + material.k_a*ambient_color;
+            } else {
+                color = color + L;
+            }
     }
     return vec4(color,1.0);
 }
@@ -456,7 +539,7 @@ void intersect_square(inout Ray r, int square_index, int object_index){
         r.t = t;
         r.hit_object_index = object_index; 
         object_set[object_index].point_of_intersection = intersection_point;
-        object_set[object_index].normal = n;
+        object_set[object_index].normal = normalize(n);
     }
 }
 
