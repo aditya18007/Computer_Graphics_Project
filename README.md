@@ -261,6 +261,55 @@ r.hit_object_index = -1;
     }
     ```
 
+### Ray Square intersection
+
+* Based on this answer : https://computergraphics.stackexchange.com/questions/8418/get-intersection-ray-with-square 
+
+```c
+void intersect_square(inout Ray r, int square_index, int object_index){
+    Square sqr = square_set[square_index];
+    vec3 p1 = sqr.A;
+    vec3 e = r.origin;
+    vec3 d = r.direction;
+    vec3 n = sqr.normal;
+    float t = dot(p1-e,n)/dot(d,n);
+    if (t < 0){
+        return;
+    }
+    if(t < SMALLEST_DIST){
+        return;
+    }
+
+    if (t >= r.t){
+        return;
+    }
+
+    vec3 intersection_point = e+t*d;
+    vec3 v = intersection_point - p1;
+    vec3 e1 = sqr.D-sqr.A;
+    vec3 e2 = sqr.B-sqr.A;
+    float width = length(e1);
+    float height = length(e2);
+    float proj1 = dot(v,e1)/width;
+    float proj2 = dot(v,e2)/height;
+    if(proj1 < 0){
+        return;
+    }
+    if (proj2 < 0){
+        return;
+    }
+    if((proj1 < width ) && (proj2 < height)){
+        r.hit = true;
+        r.t = t;
+        r.hit_object_index = object_index; 
+        object_set[object_index].point_of_intersection = intersection_point;
+        object_set[object_index].normal = normalize(n);
+    }
+}
+```
+
+
+
 ### *Blinn-Phong shading for object*
 
 #### Lighting
@@ -396,3 +445,26 @@ r.hit_object_index = -1;
     }
     ```
 
+### *Reflection*
+
+* Idea is very simple. 
+* If the ray intersects a reflective surface, we note this fact.
+* From the surface, we generate the reflected ray with ray direction and surface normal.
+* We find the point where this reflected ray intersects. That point’s color is the color of this point (as it will
+  reflect this color towards eye (−ray direction)).
+* However, too many rays can get created in the process. Thus, we limit it to a certain maximum number
+  of reflections.
+
+## Screenshots
+
+![](CG_Report/Images/CloseUp.png)
+
+![](CG_Report/Images/LimitsOfMultipleReflection.png)
+
+![](CG_Report/Images/MultipleReflections.png)
+
+![](CG_Report/Images/NonAxisAllignedMirror.png)
+
+![](CG_Report/Images/OneMirror.png)
+
+![](CG_Report/Images/PanoramicView.png)

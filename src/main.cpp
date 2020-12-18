@@ -66,11 +66,22 @@ int main(int, char**)
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glfwSetCursorPos(window, double(display_w)/2, double(display_h)/2);
-
+    glUseProgram(shaderProgram);
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-        glUseProgram(shaderProgram);
+                // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        {
+            ImGui::Begin("Information");                          
+            ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::End();
+        }
+
+        // Rendering
+        ImGui::Render();
 
         glViewport(0, 0, display_w, display_h);
         glUseProgram(shaderProgram);
@@ -134,6 +145,8 @@ int main(int, char**)
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glfwSetCursorPos(window, double(display_w)/2.0, double(display_h)/2.0);
         lastTime = currentTime;
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window);
     }
     cleanup(window);
