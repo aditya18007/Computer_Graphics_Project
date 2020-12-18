@@ -78,14 +78,14 @@ struct Square {
 //        |          |
 //        C----------B
 // Normal coming out of screen
-const int num_squares = 3;
+const int num_squares = 4;
 Square square_set[num_squares];
 
 struct Sphere {
         vec3 centre;
         float radius;
 };
-const int num_spheres = 1;
+const int num_spheres = 1+5+1;
 Sphere sphere_set[num_spheres];
 
 const int num_objects = num_squares+num_spheres;
@@ -241,11 +241,39 @@ void square_setup(){
         square_set[i].A - square_set[i].B,
         square_set[i].D - square_set[i].A
     );
+
+    //Slant
+    square_set[++i].A = vec3(  4.0 ,  8.0,  4.0);
+    square_set[i].B   = vec3(  4.0 ,  4.0, -4.0);
+    square_set[i].C   = vec3( -4.0 ,  4.0, -4.0);
+    square_set[i].D   = vec3( -4.0 ,  8.0,  4.0);
+    square_set[i].normal = cross(
+        square_set[i].A - square_set[i].B,
+        square_set[i].D - square_set[i].A
+    );
 }
 
 void sphere_setup(){
     int i = 0;
     sphere_set[i].centre = vec3(0.0,0.0,0.0);
+    sphere_set[i++].radius = 1.0;
+    /////////////////////////////////////////
+    sphere_set[i].centre = vec3(0.0,-3.0,0.0);
+    sphere_set[i++].radius = 0.7;
+
+    sphere_set[i].centre = vec3(-1.0,-3.0,1.0);
+    sphere_set[i++].radius = 1.0;
+
+    sphere_set[i].centre = vec3(1.0,-3.0,1.0);
+    sphere_set[i++].radius = 1.0;
+
+    sphere_set[i].centre = vec3(-1.0,-3.0,-1.0);
+    sphere_set[i++].radius = 1.0;
+
+    sphere_set[i].centre = vec3(1.0,-3.0,-1.0);
+    sphere_set[i++].radius = 1.0;
+    //////////////////////////////////////////
+    sphere_set[i].centre = vec3(1.0,1.0,-1.0);
     sphere_set[i++].radius = 1.0;
 }
 
@@ -272,6 +300,14 @@ void object_setup(){
     //Bottom
     object_set[i].object_type = SQUARE;
     object_set[i].object_index = i_square++;
+    object_set[i].material_type = BLINN_PHONG;
+    object_set[i].material_index = 1;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+    
+    //Slant
+    object_set[i].object_type = SQUARE;
+    object_set[i].object_index = i_square++;
     object_set[i].material_type = REFLECTIVE;
     object_set[i].material_index = 0;
     object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
@@ -286,6 +322,48 @@ void object_setup(){
     object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
     object_set[i++].normal = vec3(0.0,0.0,0.0);
 
+    //centre
+    object_set[i].object_type = SPHERE;
+    object_set[i].object_index = i_sphere++;
+    object_set[i].material_type = BLINN_PHONG;
+    object_set[i].material_index = 1;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+
+    object_set[i].object_type = SPHERE;
+    object_set[i].object_index = i_sphere++;
+    object_set[i].material_type = REFLECTIVE;
+    object_set[i].material_index = 0;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+
+    object_set[i].object_type = SPHERE;
+    object_set[i].object_index = i_sphere++;
+    object_set[i].material_type = BLINN_PHONG;
+    object_set[i].material_index = 0;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+
+    object_set[i].object_type = SPHERE;
+    object_set[i].object_index = i_sphere++;
+    object_set[i].material_type = BLINN_PHONG;
+    object_set[i].material_index = 0;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+
+    object_set[i].object_type = SPHERE;
+    object_set[i].object_index = i_sphere++;
+    object_set[i].material_type = REFLECTIVE;
+    object_set[i].material_index = 0;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
+
+    object_set[i].object_type = SPHERE;
+    object_set[i].object_index = i_sphere++;
+    object_set[i].material_type = BLINN_PHONG;
+    object_set[i].material_index = 1;
+    object_set[i].point_of_intersection = vec3(0.0,0.0,0.0);
+    object_set[i++].normal = vec3(0.0,0.0,0.0);
     sphere_setup();
 }
 void static_setup(){
@@ -345,9 +423,6 @@ void main() {
             case REFLECTIVE:
                 pixel_color = shade_reflective(R);
                 break;
-            
-            case REFRACTIVE:
-                pixel_color = shade_refractive(R);
         }
     } else {
         pixel_color = vec4(world.bgcolor,1.0);
@@ -364,41 +439,6 @@ bool refract(vec3 d, vec3 Normal, float eta, inout vec3 T){
 	c1 = c1 / eta;
 	T = c1 - n*sqrt(discriminant);
 	return true;
-}
-
-vec4 shade_refractive(inout Ray r){
-    vec3 final_color = vec3(0,0,0);
-    Ray ray = r;
-
-    for(int j = 0 ; j  < MAX_DEPTH ; j++){
-    
-        Object object = object_set[ray.hit_object_index];
-        RefractiveMaterial material = refractive_set[object.material_index];
-        vec3 point_of_intersection = object.point_of_intersection;
-        vec3 v = normalize(ray.origin-point_of_intersection);
-        vec3 n = normalize(object.normal);
-        vec3 color = vec3(0.0,0.0,0.0) ;
-        vec3 d = -v;
-        vec3 r = d - 2*(dot(d,n))*n;
-        vec3 T = vec3(0,0,0);
-        for(int i = 0; i < num_lights; i++ ){
-            PointLight light = light_set[i]; 
-            vec3 l = normalize(light.position - point_of_intersection);
-            vec3 h = normalize(v+l);
-
-            float spec = pow(max(dot(n,h),0),material.n);  
-            vec3 spec_color = spec*light.color;
-            float diff = max(dot(n,l),0);
-            vec3 diff_color = material.color*diff;
-            float c = 0;
-            float kr = 0;
-            float kg = 0;
-            float kb = 0;
-            vec3 temp = material.kd*diff_color + material.ks*spec_color;
-            final_color = final_color + temp;
-        }
-    }
-    return vec4(final_color,1);
 }
 
 vec4 shade_reflective(inout Ray r){
